@@ -158,3 +158,7 @@ Treat findings as indicators, not evidence of malicious intent.
 This project is licensed under the MIT License.
 
 See the [LICENSE](LICENSE) file for details.
+
+
+## Note
+made this cuz there were no good decompilation apps that weren't filled with ads on Android this just solves the problem a little :)
