@@ -1,4 +1,3 @@
-Here is a production-ready, GitHub-optimized README.md complete with repository badges, clean syntax highlighting, detailed usage examples, and structured markdown callouts.
 ```markdown
 # 🔍 APK Reverse Engineering & Triage CLI
 
