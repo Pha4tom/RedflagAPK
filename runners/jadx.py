@@ -24,7 +24,7 @@ def run_jadx(apk_path: str, output_dir: str, timeout: int = 300) -> dict:
         return {
             "success": False,
             "error": f"jadx hung past {timeout}s — likely the known lambda-desugaring bug, not a config issue",
-            "output_dir": str(output_dir)  # partial output may still exist, worth checking
+            "output_dir": str(output_dir)  # partial output may still exisst
         }
 
     sources_dir = output_dir / "sources"
