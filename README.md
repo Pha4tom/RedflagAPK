@@ -153,16 +153,6 @@ Treat findings as indicators, not evidence of malicious intent.
 
 ---
 
-## Roadmap
-
-- [ ] HTML report generation
-- [ ] Configurable detection rules
-- [ ] Plugin support
-- [ ] Markdown report export
-- [ ] GUI frontend
-
----
-
 ## License
 
 This project is licensed under the MIT License.
