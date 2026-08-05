@@ -54,6 +54,9 @@ def get_declared_permissions(manifest_path: str) -> list:
 
 
 def search_code_for_hints(sources_dir: str, hints: list):
+    if sources_dir is None:
+        return None
+
     sources_path = Path(sources_dir)
     if not sources_path.exists():
         return None

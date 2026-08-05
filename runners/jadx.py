@@ -21,10 +21,26 @@ def run_jadx(apk_path: str, output_dir: str, timeout: int = 300) -> dict:
             timeout=timeout
         )
     except subprocess.TimeoutExpired:
+        # jadx writes files as it decompiles, not just at the end —
+        # check what actually landed on disk before giving up entirely
+        sources_dir = output_dir / "sources"
+        java_count = len(list(sources_dir.rglob("*.java"))) if sources_dir.exists() else 0
+
+        if java_count > 0:
+            return {
+                "success": "partial",
+                "error": f"jadx hung past {timeout}s — likely the known lambda-desugaring bug, not a config issue",
+                "output_dir": str(output_dir),
+                "sources_dir": str(sources_dir),
+                "java_file_count": java_count,
+                "partial": True,
+            }
+
         return {
             "success": False,
-            "error": f"jadx hung past {timeout}s — likely the known lambda-desugaring bug, not a config issue",
-            "output_dir": str(output_dir)  # partial output may still exist, worth checking
+            "error": f"jadx hung past {timeout}s with zero files decompiled — likely OOM or true hang, not just slow",
+            "output_dir": str(output_dir),
+            "partial": False,
         }
 
     sources_dir = output_dir / "sources"
@@ -37,4 +53,5 @@ def run_jadx(apk_path: str, output_dir: str, timeout: int = 300) -> dict:
         "java_file_count": java_count,
         "error_count": result.stdout.count("ERROR"),  # jadx logs errors inline, rough count
         "stdout": result.stdout if java_count == 0 else "",  # don't dump 3000 lines if it worked
+        "partial": False,
     }

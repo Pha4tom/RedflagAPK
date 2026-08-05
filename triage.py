@@ -61,12 +61,16 @@ def main():
 
     log("[*] Running jadx...", quiet)
     jadx_result = run_jadx(str(apk_path), str(jadx_out), timeout=args.jadx_timeout)
-    jadx_sources_dir = jadx_result.get("sources_dir") if jadx_result["success"] else None
-    if not jadx_result["success"]:
+    jadx_sources_dir = jadx_result.get("sources_dir") if jadx_result["success"] in (True, "partial") else None
+
+    if jadx_result["success"] is True:
+        log(f"[+] jadx OK — {jadx_result['java_file_count']} Java files", quiet)
+    elif jadx_result["success"] == "partial":
+        log(f"[!] jadx partial: {jadx_result.get('error')}", quiet)
+        log(f"[!] salvaged {jadx_result['java_file_count']} Java files — checks will run against partial coverage", quiet)
+    else:
         log(f"[!] jadx failed: {jadx_result.get('error')}", quiet)
         log("[!] continuing with apktool-only data, jadx-dependent checks will be degraded", quiet)
-    else:
-        log(f"[+] jadx OK — {jadx_result['java_file_count']} Java files", quiet)
 
     log("[*] Running checks...", quiet)
 
@@ -105,7 +109,11 @@ def main():
         "apk": apk_path.name,
         "package": package_name,
         "apktool": {"success": apktool_result["success"]},
-        "jadx": {"success": jadx_result["success"], "java_file_count": jadx_result.get("java_file_count", 0)},
+        "jadx": {
+            "success": jadx_result["success"],
+            "java_file_count": jadx_result.get("java_file_count", 0),
+            "partial": jadx_result.get("partial", False),
+        },
         "checks": results,
         "summary": {
             "flagged_checks": flagged_checks,
@@ -125,6 +133,8 @@ def main():
         print(f"[*] Package: {package_name}")
         print(f"[*] {len(flagged_checks)}/5 checks flagged: {', '.join(flagged_checks) if flagged_checks else 'none'}")
         print(f"[*] Overall severity: {overall_severity}")
+        if jadx_result.get("partial"):
+            print(f"[!] WARNING: jadx only partially decompiled this APK ({jadx_result['java_file_count']} files salvaged) — results may miss additional findings")
         print(f"[*] Full results written to {out_path}")
 
 

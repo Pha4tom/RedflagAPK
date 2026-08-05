@@ -53,6 +53,13 @@ def check_obfuscation(apktool_output_dir: str, jadx_sources_dir: str) -> dict:
         }
 
     package_path = package_name.replace(".", "/")
+    if jadx_sources_dir is None:
+        return {
+            "flag": False,
+            "severity": "none",
+            "error": "jadx failed, obfuscation check needs decompiled sources",
+        }
+
     sources_path = Path(jadx_sources_dir)
 
     if not sources_path.exists():
