@@ -1,4 +1,4 @@
-# 🔴 RedflagAPK
+#  RedflagAPK
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Termux%20%7C%20Linux-green.svg)]
@@ -10,7 +10,7 @@
 
 ---
 
-## ✨ What is RedflagAPK?
+##  What is RedflagAPK?
 
 RedflagAPK is a Python CLI that combines **apktool** and **JADX** with several static analysis checks to quickly identify suspicious indicators inside Android applications.
 
@@ -33,14 +33,14 @@ Instead of manually digging through thousands of files immediately after decompi
 
 # 🔍 Checks
 
-### 🛡️ Permission Analysis
+###  Permission Analysis
 
 - Detects dangerous permissions declared in the manifest
 - Flags permissions that are never referenced in application code
 
 ---
 
-### 💸 Financial Artifacts
+###  Financial Artifacts
 
 Looks for:
 
@@ -52,7 +52,7 @@ Useful for spotting suspicious payment implementations.
 
 ---
 
-### 🌐 Remote Configuration
+###  Remote Configuration
 
 Detects references to services commonly used for remote configuration or dead-drop infrastructure.
 
@@ -64,7 +64,7 @@ Examples include:
 
 ---
 
-### 🕵️ Anti-Analysis
+###  Anti-Analysis
 
 Detects common anti-analysis techniques including:
 
@@ -118,7 +118,7 @@ result.json
 
 ---
 
-# 📦 Requirements
+#  Requirements
 
 - Python 3.8+
 - apktool
@@ -128,7 +128,7 @@ Both tools must be available in your `PATH`.
 
 ---
 
-# 🚀 Installation
+#  Installation
 
 ## Termux
 
@@ -151,7 +151,7 @@ cd RedflagAPK
 
 ---
 
-# 💻 Usage
+#  Usage
 
 ```bash
 python triage.py app.apk
@@ -168,7 +168,7 @@ python triage.py app.apk
 
 ---
 
-# 📊 Example Output
+#  Example Output
 
 ```text
 Scanning: sample.apk
@@ -190,7 +190,7 @@ output/result.json
 
 ---
 
-# ⚠️ Limitations
+#  Limitations
 
 Static analysis cannot detect everything.
 
@@ -206,7 +206,7 @@ Treat findings as indicators, **not proof** of malicious intent.
 
 ---
 
-# ❤️ Why I Built This
+#  Why i made this?
 
 I do almost all of my reverse engineering on Android using **Termux**.
 
