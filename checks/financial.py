@@ -1,5 +1,5 @@
 # checks/financial.py — hardcoded wallet/payment identifier sweep
-# scoped to skip common third-party/stdlib namespaces that cause false positives
+# made tk skip common third-party/stdlib namespaces that cause false positives
 
 import re
 from pathlib import Path

@@ -41,6 +41,8 @@ def run_jadx(apk_path: str, output_dir: str, timeout: int = 300) -> dict:
             "error": f"jadx hung past {timeout}s with zero files decompiled — likely OOM or true hang, not just slow",
             "output_dir": str(output_dir),
             "partial": False,
+            "error": f"jadx hung past {timeout}s — likely the known lambda-desugaring bug, not a config issue",
+            "output_dir": str(output_dir)  # partial output may still exisst
         }
 
     sources_dir = output_dir / "sources"

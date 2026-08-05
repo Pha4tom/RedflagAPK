@@ -1,11 +1,10 @@
-# never commit actual APK samples or decompiled output
+
 __pycache__/
 *.pyc
 *.apk
 output/
 samples/
 
-# in case triage.py gets run from inside this repo with default relative paths
 ../output/
 ../samples/
 

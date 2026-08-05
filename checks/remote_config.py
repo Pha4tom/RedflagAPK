@@ -1,5 +1,5 @@
 # checks/remote_config.py — dead-drop / remote-config URL detection
-# scoped to skip common third-party/stdlib namespaces (false-positive source)
+# skips common third-party/stdlib namespaces (false-positive source)
 
 import re
 from pathlib import Path

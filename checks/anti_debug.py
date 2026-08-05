@@ -1,5 +1,5 @@
 # checks/anti_debug.py — anti-RE / anti-debug / root-detection signal grep
-# scoped to skip common third-party/stdlib namespaces that cause false positives
+# skip common third-party/stdlib namespaces that cause false positives
 
 import re
 from pathlib import Path
