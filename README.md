@@ -169,7 +169,7 @@ python triage.py app.apk
 ---
 
 #  Example Output
-
+(this may be outdated since I change alot of stuff)
 ```text
 Scanning: sample.apk
 
