@@ -4,6 +4,7 @@
 import argparse
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from runners.apktool import run_apktool
@@ -34,6 +35,11 @@ def main():
                          help="Print only the final JSON to stdout (for scripting/piping)")
     parser.add_argument("--jadx-timeout", type=int, default=300,
                          help="Timeout in seconds for jadx decompile (default: 300)")
+    parser.add_argument("--sequential", action="store_true",
+                         help="Run apktool then jadx sequentially instead of parallel. "
+                              "Both are JVM processes — on large APKs, running them "
+                              "concurrently can hit your 8GB memory ceiling. Use this "
+                              "flag if you get OOM/killed processes on big samples.")
     args = parser.parse_args()
 
     quiet = args.quiet or args.json_only
@@ -50,17 +56,31 @@ def main():
     log(f"[*] Target: {apk_path.name}", quiet)
     log(f"[*] Output: {base_out}", quiet)
 
-    log("[*] Running apktool...", quiet)
-    apktool_result = run_apktool(str(apk_path), str(apktool_out))
+    # apktool and jadx don't depend on each other's output — both take the raw APK
+    # as input. Running them sequentially was wasted wall-clock time. Parallel by
+    # default; fall back to sequential with --sequential if you OOM on big APKs
+    # (both are JVM processes, running two at once doubles peak memory).
+    if args.sequential:
+        log("[*] Running apktool...", quiet)
+        apktool_result = run_apktool(str(apk_path), str(apktool_out))
+        log("[*] Running jadx...", quiet)
+        jadx_result = run_jadx(str(apk_path), str(jadx_out), timeout=args.jadx_timeout)
+    else:
+        log("[*] Running apktool + jadx in parallel...", quiet)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            # apktool progress off — its own spinner just adds noise since jadx
+            # almost always takes longer and its file-count progress is more useful
+            apktool_future = pool.submit(run_apktool, str(apk_path), str(apktool_out), False)
+            jadx_future = pool.submit(run_jadx, str(apk_path), str(jadx_out), args.jadx_timeout, True)
+            apktool_result = apktool_future.result()
+            jadx_result = jadx_future.result()
+
     if not apktool_result["success"]:
         print(f"[!] apktool failed: {apktool_result.get('error')}", file=sys.stderr)
         sys.exit(1)
     log("[+] apktool OK — manifest + smali extracted", quiet)
 
     manifest_path = apktool_result["manifest_path"]
-
-    log("[*] Running jadx...", quiet)
-    jadx_result = run_jadx(str(apk_path), str(jadx_out), timeout=args.jadx_timeout)
     jadx_sources_dir = jadx_result.get("sources_dir") if jadx_result["success"] in (True, "partial") else None
 
     if jadx_result["success"] is True:

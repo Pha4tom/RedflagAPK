@@ -2,6 +2,17 @@
 
 # namespaces that generate false positives — stdlib, androidx, kotlin, common third-party libs
 # these get skipped by default in checks that scan decompiled Java source
+# checks/common.py
+import threading
+
+_print_lock = threading.Lock()
+
+def progress_print(msg: str):
+    """Thread-safe progress line. Don't use \r overwrite — Termux terminal
+    handling of carriage returns across threads is unreliable and garbles output."""
+    with _print_lock:
+        print(msg, flush=True)
+
 NOISY_NAMESPACES = [
     "kotlin/",
     "kotlinx/",
