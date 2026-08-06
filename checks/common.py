@@ -1,36 +1,35 @@
-# checks/common.py — shared constants used across multiple checks
+import os
+import re
+import mmap
 
-# namespaces that generate false positives — stdlib, androidx, kotlin, common third-party libs
-# these get skipped by default in checks that scan decompiled Java source
-# checks/common.py
-import threading
+# Pre-compile noisy third-party libraries to ignore during static scan
+IGNORED_DIRS = {
+    'androidx', 'android/support', 'com/google', 'kotlin',
+    'kotlinx', 'com/facebook', 'io/reactivex', 'com/squareup'
+}
 
-_print_lock = threading.Lock()
+def is_third_party(file_path: str) -> bool:
+    """Check if the file belongs to common third-party libraries."""
+    normalized = file_path.replace('\\', '/')
+    return any(ignored in normalized for ignored in IGNORED_DIRS)
 
-def progress_print(msg: str):
-    """Thread-safe progress line. Don't use \r overwrite — Termux terminal
-    handling of carriage returns across threads is unreliable and garbles output."""
-    with _print_lock:
-        print(msg, flush=True)
+def scan_file_with_regex(file_path: str, compiled_regexes: list) -> list:
+    """Scan a single file using memory-mapped reading and pre-compiled regexes."""
+    matches = []
+    if is_third_party(file_path):
+        return matches
 
-NOISY_NAMESPACES = [
-    "kotlin/",
-    "kotlinx/",
-    "androidx/",
-    "com/google/android/",
-    "com/google/gson/",
-    "com/google/firebase/",
-    "okhttp3/",
-    "okio/",
-    "retrofit2/",
-    "com/squareup/",
-    "com/mikepenz/",       # material icon font libs, seen false-positive on license URLs
-    "com/bumptech/glide/", # common image loading lib
-    "io/reactivex/",       # RxJava
-    "androidx/lifecycle/",
-]
-
-
-def is_noisy_path(filepath) -> bool:
-    path_str = str(filepath).replace("\\", "/")
-    return any(ns in path_str for ns in NOISY_NAMESPACES)
+    try:
+        with open(file_path, "rb") as f:
+            if os.path.getsize(file_path) == 0:
+                return matches
+            with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                for rule_id, pattern in compiled_regexes:
+                    if pattern.search(mm):
+                        matches.append({
+                            "rule_id": rule_id,
+                            "file": file_path
+                        })
+    except Exception:
+        pass
+    return matches
