@@ -13,6 +13,60 @@ from checks.obfuscation import check_obfuscation
 from checks.remote_config import check_remote_config
 from checks.financial import check_financial
 
+# Maps each rule_id / finding type to a severity tier.
+# Anything not listed here defaults to "low" in compute_severity().
+SEVERITY_MAP = {
+    # financial
+    "financial_btc_address": "high",
+    "financial_eth_address": "high",
+    "financial_iban": "high",
+    "financial_usdt_trc20": "high",
+    "financial_egypt_phone_payment_context": "medium",
+    "financial_accessibility_binding": "medium",
+    "financial_overlay_trigger": "medium",
+    "financial_sms_interceptor": "high",
+
+    # remote config / dead-drop
+    "remote_config_pastebin": "high",
+    "remote_config_gist": "high",
+    "remote_config_raw_github": "medium",
+    "remote_config_firebase_rtdb": "medium",
+    "remote_config_ip_literal": "medium",
+    "remote_config_dynamic_load": "low",
+
+    # anti-debug / packers
+    "anti_debug_isdebuggerconnected": "low",
+    "anti_debug_ptrace": "low",
+    "root_detect_test_keys": "low",
+    "root_detect_su_binary": "medium",
+    "packer_jiagu": "medium",
+    "packer_bangcle": "medium",
+    "packer_tencent_legu": "medium",
+    "packer_ijiami": "medium",
+
+    # obfuscation
+    "obfuscation_dex_class_loader": "medium",
+    "obfuscation_reflection_invoke": "low",
+    "obfuscation_base64_decode": "low",
+
+    # permissions
+    "dangerous_permission": "medium",
+}
+
+def compute_severity(findings: list) -> str:
+    """Roll up individual findings into one overall severity rating."""
+    levels_present = set()
+    for f in findings:
+        rule_id = f.get("rule_id") or f.get("type")
+        levels_present.add(SEVERITY_MAP.get(rule_id, "low"))
+    if "high" in levels_present:
+        return "high"
+    if "medium" in levels_present:
+        return "medium"
+    if "low" in levels_present:
+        return "low"
+    return "none"
+
 def draw_progress_bar(iteration: int, total: int, prefix='Scanning', length=30):
     """Render a clean CLI progress bar natively in the terminal."""
     if total == 0:
@@ -103,6 +157,7 @@ def main():
         "target": os.path.basename(apk_path),
         "execution_time_seconds": round(total_time, 2),
         "total_flags": len(findings),
+        "overall_severity": compute_severity(findings),
         "flags": findings
     }
 
@@ -112,6 +167,7 @@ def main():
     print(f"\n[+] Analysis complete in {total_time:.2f}s!")
     print(f"    ├── Decompilation: {decompile_time:.2f}s")
     print(f"    ├── Code Scan    : {scan_time:.2f}s")
+    print(f"    ├── Severity     : {compute_severity(findings)}")
     print(f"    └── Output Directory: {output_dir}")
     print(f"        ├── report.json")
     print(f"        ├── apktool_out/")
