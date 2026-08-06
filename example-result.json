@@ -1,0 +1,56 @@
+{
+  "apk": "1xBet_1.0.apk",
+  "package": "com.example.bet",
+  "apktool": {
+    "success": true
+  },
+  "jadx": {
+    "success": true,
+    "java_file_count": 3148,
+    "partial": false
+  },
+  "checks": {
+    "permissions": {
+      "flag": false,
+      "evidence": [],
+      "severity": "none",
+      "declared_dangerous_perms": [],
+      "unused_dangerous_perms": []
+    },
+    "financial": {
+      "flag": true,
+      "evidence": [
+        "hardcoded phone number '01207355930' found near payment context in DepositActivity.java:339"
+      ],
+      "severity": "medium",
+      "finding_count": 1,
+      "files_skipped_as_noisy": 6
+    },
+    "remote_config": {
+      "flag": false,
+      "evidence": [],
+      "severity": "none",
+      "finding_count": 0,
+      "files_skipped_as_noisy": 0
+    },
+    "anti_debug": {
+      "flag": false,
+      "evidence": [],
+      "severity": "none",
+      "finding_count": 0,
+      "categories_hit": [],
+      "manifest_debuggable_true": true,
+      "files_skipped_as_noisy": 0
+    },
+    "obfuscation": {
+      "flag": false,
+      "severity": "none",
+      "short_name_ratio": 0.06,
+      "app_file_count": 8
+    }
+  },
+  "summary": {
+    "flagged_checks": ["financial"],
+    "overall_severity": "medium"
+  }
+}
