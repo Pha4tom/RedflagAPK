@@ -7,16 +7,24 @@ import concurrent.futures
 
 from runners.apktool import run_apktool
 from runners.jadx import run_jadx
+
 from checks.permissions import analyze_manifest
 from checks.anti_debug import check_anti_debug
 from checks.obfuscation import check_obfuscation
 from checks.remote_config import check_remote_config
 from checks.financial import check_financial
+from checks.flutter import check_flutter
+from checks.native import check_native
+from checks.flutter_aot import check_flutter_aot
 
-# Maps each rule_id / finding type to a severity tier.
-# Anything not listed here defaults to "low" in compute_severity().
+
+# ============================================================
+# SEVERITY MAP
+# ============================================================
+
 SEVERITY_MAP = {
-    # financial
+
+    # Financial
     "financial_btc_address": "high",
     "financial_eth_address": "high",
     "financial_iban": "high",
@@ -26,7 +34,7 @@ SEVERITY_MAP = {
     "financial_overlay_trigger": "medium",
     "financial_sms_interceptor": "high",
 
-    # remote config / dead-drop
+    # Remote config
     "remote_config_pastebin": "high",
     "remote_config_gist": "high",
     "remote_config_raw_github": "medium",
@@ -34,144 +42,690 @@ SEVERITY_MAP = {
     "remote_config_ip_literal": "medium",
     "remote_config_dynamic_load": "low",
 
-    # anti-debug / packers
+    # Anti-debug / packers
     "anti_debug_isdebuggerconnected": "low",
     "anti_debug_ptrace": "low",
     "root_detect_test_keys": "low",
     "root_detect_su_binary": "medium",
+
     "packer_jiagu": "medium",
     "packer_bangcle": "medium",
     "packer_tencent_legu": "medium",
     "packer_ijiami": "medium",
 
-    # obfuscation
+    # Obfuscation
     "obfuscation_dex_class_loader": "medium",
     "obfuscation_reflection_invoke": "low",
     "obfuscation_base64_decode": "low",
 
-    # permissions
+    # Permissions
     "dangerous_permission": "medium",
+
+    # Flutter
+    "flutter_detected": "low",
+    "flutter_google_api_key": "high",
+    "flutter_jwt": "high",
+    "flutter_bearer_token": "high",
+    "flutter_firebase": "medium",
+    "flutter_supabase": "medium",
+    "flutter_aws": "medium",
+    "flutter_websocket": "medium",
+    "flutter_http": "low",
+
+    # Flutter AOT
+    "flutter_aot_analyzed": "low",
+    "flutter_aot_firebase": "medium",
+    "flutter_aot_supabase": "medium",
+    "flutter_aot_aws": "medium",
+    "flutter_aot_api_key": "high",
+    "flutter_aot_authorization": "medium",
+
+    # Native
+    "native_google_api_key": "high",
+    "native_jwt": "high",
+    "native_bearer_token": "high",
+    "native_websocket": "medium",
+    "native_http_url": "low",
+    "native_ipv4": "low",
+    "native_email": "low",
+    "native_root": "medium",
+    "native_debug": "medium",
+    "native_jni": "low",
 }
 
+
+# ============================================================
+# SEVERITY
+# ============================================================
+
 def compute_severity(findings: list) -> str:
-    """Roll up individual findings into one overall severity rating."""
+    """Calculate the highest severity found."""
+
     levels_present = set()
-    for f in findings:
-        rule_id = f.get("rule_id") or f.get("type")
-        levels_present.add(SEVERITY_MAP.get(rule_id, "low"))
+
+    for finding in findings:
+
+        rule_id = (
+            finding.get("rule_id")
+            or finding.get("type")
+        )
+
+        levels_present.add(
+            SEVERITY_MAP.get(
+                rule_id,
+                "low",
+            )
+        )
+
     if "high" in levels_present:
         return "high"
+
     if "medium" in levels_present:
         return "medium"
+
     if "low" in levels_present:
         return "low"
+
     return "none"
 
-def draw_progress_bar(iteration: int, total: int, prefix='Scanning', length=30):
-    """Render a clean CLI progress bar natively in the terminal."""
+
+# ============================================================
+# PROGRESS BAR
+# ============================================================
+
+def draw_progress_bar(
+    iteration: int,
+    total: int,
+    prefix="Scanning",
+    length=30,
+):
+    """Render a CLI progress bar."""
+
     if total == 0:
         return
+
     percent = f"{100 * (iteration / float(total)):.1f}"
-    filled_length = int(length * iteration // total)
-    bar = '█' * filled_length + '-' * (length - filled_length)
-    sys.stdout.write(f'\r[*] {prefix} |{bar}| {percent}% ({iteration}/{total} files)')
+
+    filled_length = int(
+        length * iteration // total
+    )
+
+    bar = (
+        "█" * filled_length
+        + "-" * (length - filled_length)
+    )
+
+    sys.stdout.write(
+        f"\r[*] {prefix} |{bar}| "
+        f"{percent}% ({iteration}/{total} files)"
+    )
+
     sys.stdout.flush()
+
     if iteration == total:
-        sys.stdout.write('\n')
+        sys.stdout.write("\n")
+
+
+# ============================================================
+# JAVA/KOTLIN WORKER
+# ============================================================
 
 def worker_task(file_path: str) -> list:
-    """Execute analysis checks on a single source file."""
+    """Run all Java/Kotlin checks on one source file."""
+
     results = []
-    results.extend(check_anti_debug(file_path))
-    results.extend(check_obfuscation(file_path))
-    results.extend(check_remote_config(file_path))
-    results.extend(check_financial(file_path))
+
+    results.extend(
+        check_anti_debug(file_path)
+    )
+
+    results.extend(
+        check_obfuscation(file_path)
+    )
+
+    results.extend(
+        check_remote_config(file_path)
+    )
+
+    results.extend(
+        check_financial(file_path)
+    )
+
     return results
 
+
+# ============================================================
+# MAIN
+# ============================================================
+
 def main():
-    parser = argparse.ArgumentParser(description="RedflagAPK - High Performance Static APK Triaging")
-    parser.add_argument("--apk", required=True, help="Path to target APK file")
-    parser.add_argument("-o", "--output", required=True, help="Output directory path for report and decompiled assets")
-    parser.add_argument("--threads", type=int, default=os.cpu_count() or 4, help="CPU cores to use")
+
+    parser = argparse.ArgumentParser(
+        description=(
+            "RedflagAPK - Static APK Triaging"
+        )
+    )
+
+    parser.add_argument(
+        "--apk",
+        required=True,
+        help="Path to target APK",
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        required=True,
+        help="Output directory",
+    )
+
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=os.cpu_count() or 4,
+        help="CPU cores to use",
+    )
+
     args = parser.parse_args()
+
+    # --------------------------------------------------------
+    # Paths
+    # --------------------------------------------------------
 
     start_time = time.time()
 
-    apk_path = os.path.abspath(os.path.expanduser(args.apk))
-    output_dir = os.path.abspath(os.path.expanduser(args.output))
+    apk_path = os.path.abspath(
+        os.path.expanduser(args.apk)
+    )
 
-    os.makedirs(output_dir, exist_ok=True)
-    report_file = os.path.join(output_dir, "report.json")
+    output_dir = os.path.abspath(
+        os.path.expanduser(args.output)
+    )
 
-    print(f"[*] Starting triage for: {os.path.basename(apk_path)}")
-    print(f"[*] Output directory set to: {output_dir}\n")
+    os.makedirs(
+        output_dir,
+        exist_ok=True,
+    )
 
-    # 1. Unpack & Decompile
-    decompile_start = time.time()
-    print("[*] [1/4] Unpacking resources with Apktool...")
-    apktool_dir = run_apktool(apk_path, output_dir)
-    
-    print(f"[*] [2/4] Decompiling Java source with JADX ({args.threads} cores)...")
-    jadx_dir = run_jadx(apk_path, output_dir, threads=args.threads)
-    decompile_time = time.time() - decompile_start
+    report_file = os.path.join(
+        output_dir,
+        "report.json",
+    )
+
+    print(
+        f"[*] Starting triage for: "
+        f"{os.path.basename(apk_path)}"
+    )
+
+    print(
+        f"[*] Output directory set to: "
+        f"{output_dir}\n"
+    )
 
     findings = []
 
-    # 2. Analyze AndroidManifest.xml
+    # ========================================================
+    # 1. APKTOOL
+    # ========================================================
+
+    apktool_start = time.time()
+
+    print(
+        "[*] [1/4] Unpacking resources with Apktool..."
+    )
+
+    apktool_dir = run_apktool(
+        apk_path,
+        output_dir,
+    )
+
+    apktool_time = (
+        time.time() - apktool_start
+    )
+
+    # ========================================================
+    # 2. JADX
+    # ========================================================
+
+    jadx_start = time.time()
+
+    print(
+        f"[*] [2/4] Decompiling Java source "
+        f"with JADX ({args.threads} cores)..."
+    )
+
+    jadx_dir = run_jadx(
+        apk_path,
+        output_dir,
+        threads=args.threads,
+    )
+
+    jadx_time = (
+        time.time() - jadx_start
+    )
+
+    # ========================================================
+    # 3. MANIFEST
+    # ========================================================
+
+    manifest_start = time.time()
+
     if apktool_dir:
-        manifest_path = os.path.join(apktool_dir, "AndroidManifest.xml")
-        if os.path.exists(manifest_path):
-            print("[*] [3/4] Analyzing permissions in AndroidManifest.xml...")
-            findings.extend(analyze_manifest(manifest_path))
 
-    # 3. Parallel scan decompiled source files
-    scan_start = time.time()
-    if jadx_dir and os.path.exists(jadx_dir):
-        print("[*] [4/4] Collecting decompiled files for scanning...")
-        files_to_scan = []
-        for root, _, files in os.walk(jadx_dir):
+        manifest_path = os.path.join(
+            apktool_dir,
+            "AndroidManifest.xml",
+        )
+
+        if os.path.exists(
+            manifest_path
+        ):
+
+            print(
+                "[*] [3/4] Analyzing permissions "
+                "in AndroidManifest.xml..."
+            )
+
+            findings.extend(
+                analyze_manifest(
+                    manifest_path
+                )
+            )
+
+    manifest_time = (
+        time.time() - manifest_start
+    )
+
+    # ========================================================
+    # 4. JAVA / KOTLIN
+    # ========================================================
+
+    java_scan_start = time.time()
+
+    files_to_scan = []
+
+    if (
+        jadx_dir
+        and os.path.exists(jadx_dir)
+    ):
+
+        print(
+            "[*] [4/4] Collecting Java/Kotlin "
+            "files for scanning..."
+        )
+
+        for root, _, files in os.walk(
+            jadx_dir
+        ):
+
             for file in files:
-                if file.endswith((".java", ".kt")):
-                    files_to_scan.append(os.path.join(root, file))
 
-        total_files = len(files_to_scan)
-        
-        if total_files > 0:
-            completed = 0
-            draw_progress_bar(0, total_files)
-            
-            with concurrent.futures.ProcessPoolExecutor(max_workers=args.threads) as executor:
-                futures = [executor.submit(worker_task, f) for f in files_to_scan]
-                for future in concurrent.futures.as_completed(futures):
-                    completed += 1
-                    res = future.result()
-                    if res:
-                        findings.extend(res)
-                    draw_progress_bar(completed, total_files)
-    
-    scan_time = time.time() - scan_start
-    total_time = time.time() - start_time
+                if file.endswith(
+                    (".java", ".kt")
+                ):
 
-    # 4. Save results to report.json inside output_dir
-    report = {
-        "target": os.path.basename(apk_path),
-        "execution_time_seconds": round(total_time, 2),
-        "total_flags": len(findings),
-        "overall_severity": compute_severity(findings),
-        "flags": findings
+                    files_to_scan.append(
+                        os.path.join(
+                            root,
+                            file,
+                        )
+                    )
+
+    total_files = len(
+        files_to_scan
+    )
+
+    if total_files > 0:
+
+        completed = 0
+
+        draw_progress_bar(
+            0,
+            total_files,
+            prefix="Java/Kotlin",
+        )
+
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=args.threads
+        ) as executor:
+
+            futures = [
+                executor.submit(
+                    worker_task,
+                    file_path,
+                )
+                for file_path in files_to_scan
+            ]
+
+            for future in concurrent.futures.as_completed(
+                futures
+            ):
+
+                completed += 1
+
+                try:
+                    result = future.result()
+
+                    if result:
+                        findings.extend(result)
+
+                except Exception as error:
+
+                    print(
+                        f"\n[!] Worker error: "
+                        f"{error}"
+                    )
+
+                draw_progress_bar(
+                    completed,
+                    total_files,
+                    prefix="Java/Kotlin",
+                )
+
+    java_scan_time = (
+        time.time()
+        - java_scan_start
+    )
+
+    # ========================================================
+    # 5. FLUTTER
+    # ========================================================
+
+    flutter_start = time.time()
+
+    print(
+        "[*] Scanning Flutter framework/assets..."
+    )
+
+    flutter_info = {
+        "detected": False,
+        "libapp": None,
+        "available": False,
+        "reason": "Flutter not detected",
+        "findings": [],
     }
 
-    with open(report_file, "w") as f:
-        json.dump(report, f, indent=4)
+    if apktool_dir:
 
-    print(f"\n[+] Analysis complete in {total_time:.2f}s!")
-    print(f"    ├── Decompilation: {decompile_time:.2f}s")
-    print(f"    ├── Code Scan    : {scan_time:.2f}s")
-    print(f"    ├── Severity     : {compute_severity(findings)}")
-    print(f"    └── Output Directory: {output_dir}")
-    print(f"        ├── report.json")
-    print(f"        ├── apktool_out/")
-    print(f"        └── jadx_out/")
+        findings.extend(
+            check_flutter(
+                apktool_dir
+            )
+        )
+
+        flutter_aot_dir = os.path.join(
+            output_dir,
+            "flutter_aot",
+        )
+
+        flutter_info = check_flutter_aot(
+            apktool_dir,
+            flutter_aot_dir,
+        )
+
+        if not isinstance(
+            flutter_info,
+            dict
+        ):
+
+            flutter_info = {
+                "detected": False,
+                "libapp": None,
+                "available": False,
+                "reason": (
+                    "Invalid flutter_aot result"
+                ),
+                "findings": [],
+            }
+
+        findings.extend(
+            flutter_info.get(
+                "findings",
+                [],
+            )
+        )
+
+    flutter_time = (
+        time.time()
+        - flutter_start
+    )
+
+    # ========================================================
+    # 6. NATIVE
+    # ========================================================
+
+    native_start = time.time()
+
+    print(
+        "[*] Scanning native libraries..."
+    )
+
+    if apktool_dir:
+
+        findings.extend(
+            check_native(
+                apktool_dir
+            )
+        )
+
+    native_time = (
+        time.time()
+        - native_start
+    )
+
+    # ========================================================
+    # OUTPUT DIRECTORY STATUS
+    # ========================================================
+
+    flutter_aot_dir = os.path.join(
+        output_dir,
+        "flutter_aot",
+    )
+
+    flutter_aot_exists = os.path.isdir(
+        flutter_aot_dir
+    )
+
+    # ========================================================
+    # TOTAL TIME
+    # ========================================================
+
+    total_time = (
+        time.time()
+        - start_time
+    )
+
+    overall_severity = compute_severity(
+        findings
+    )
+
+    # ========================================================
+    # REPORT
+    # ========================================================
+
+    report = {
+
+        "target": os.path.basename(
+            apk_path
+        ),
+
+        "execution_time_seconds": round(
+            total_time,
+            2,
+        ),
+
+        "timing": {
+
+            "apktool_seconds": round(
+                apktool_time,
+                2,
+            ),
+
+            "jadx_seconds": round(
+                jadx_time,
+                2,
+            ),
+
+            "manifest_seconds": round(
+                manifest_time,
+                2,
+            ),
+
+            "java_kotlin_scan_seconds": round(
+                java_scan_time,
+                2,
+            ),
+
+            "flutter_scan_seconds": round(
+                flutter_time,
+                2,
+            ),
+
+            "native_scan_seconds": round(
+                native_time,
+                2,
+            ),
+        },
+
+        "files_scanned": {
+
+            "java_kotlin": total_files,
+
+        },
+
+        "flutter": {
+
+            "detected": flutter_info.get(
+                "detected",
+                False,
+            ),
+
+            "libapp": flutter_info.get(
+                "libapp",
+            ),
+
+            "aot_analyzer": {
+
+                "available": flutter_info.get(
+                    "available",
+                    False,
+                ),
+
+                "reason": flutter_info.get(
+                    "reason",
+                ),
+
+                "output_directory": (
+                    flutter_aot_dir
+                    if flutter_aot_exists
+                    else None
+                ),
+            },
+        },
+
+        "total_flags": len(
+            findings
+        ),
+
+        "overall_severity": (
+            overall_severity
+        ),
+
+        "flags": findings,
+    }
+
+    with open(
+        report_file,
+        "w",
+        encoding="utf-8",
+    ) as file:
+
+        json.dump(
+            report,
+            file,
+            indent=4,
+        )
+
+    # ========================================================
+    # SUMMARY
+    # ========================================================
+
+    print(
+        f"\n[+] Analysis complete "
+        f"in {total_time:.2f}s!"
+    )
+
+    print(
+        f"    ├── Apktool       : "
+        f"{apktool_time:.2f}s"
+    )
+
+    print(
+        f"    ├── JADX          : "
+        f"{jadx_time:.2f}s"
+    )
+
+    print(
+        f"    ├── Manifest      : "
+        f"{manifest_time:.2f}s"
+    )
+
+    print(
+        f"    ├── Java/Kotlin   : "
+        f"{java_scan_time:.2f}s "
+        f"({total_files} files)"
+    )
+
+    print(
+        f"    ├── Flutter       : "
+        f"{flutter_time:.2f}s"
+    )
+
+    print(
+        f"    ├── Native        : "
+        f"{native_time:.2f}s"
+    )
+
+    print(
+        f"    ├── Flags         : "
+        f"{len(findings)}"
+    )
+
+    print(
+        f"    ├── Severity      : "
+        f"{overall_severity}"
+    )
+
+    print(
+        f"    └── Output        : "
+        f"{output_dir}"
+    )
+
+    print(
+        "        ├── report.json"
+    )
+
+    print(
+        "        ├── apktool_out/"
+    )
+
+    print(
+        "        ├── jadx_out/"
+    )
+
+    if flutter_aot_exists:
+
+        print(
+            "        └── flutter_aot/"
+        )
+
+    else:
+
+        print(
+            "        └── flutter_aot/ "
+            "(not generated)"
+        )
+
 
 if __name__ == "__main__":
     main()
