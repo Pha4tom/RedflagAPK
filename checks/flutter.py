@@ -1,181 +1,182 @@
 import os
 import re
+import subprocess
+from pathlib import Path
 
 
-PATTERNS = {
-    "flutter_google_api_key": r"\bAIza[0-9A-Za-z\-_]{35}\b",
-    "flutter_jwt": r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",
-    "flutter_bearer_token": r"\bBearer\s+[A-Za-z0-9._~+/=-]{20,}",
-    "flutter_supabase": r"https?://[A-Za-z0-9.-]+\.supabase\.co[^\s\"'<>]*",
-    "flutter_firebase": r"https?://[A-Za-z0-9.-]+\.firebaseio\.com[^\s\"'<>]*",
-    "flutter_aws": r"https?://[A-Za-z0-9.-]+\.amazonaws\.com[^\s\"'<>]*",
-    "flutter_websocket": r"wss?://[^\s\"'<>]+",
+RULES = {
     "flutter_http": r"https?://[^\s\"'<>]+",
 }
 
 
-# Documentation / framework domains commonly embedded in Flutter itself.
-IGNORED_DOMAINS = (
-    "w3.org",
-    "unicode.org",
-    "googlesource.com",
+# URLs that are normally just Flutter/Dart/framework metadata.
+IGNORED_DOMAINS = {
+    "api.flutter.dev",
+    "flutter.dev",
+    "dartbug.com",
+    "example.com",
+    "play.google.com",
+    "raw.githubusercontent.com",
     "github.com",
-    "dart-lang.org",
-    "gcc.gnu.org",
-    "android.com",
-)
+}
 
 
-ASSET_EXTENSIONS = (
-    ".json",
-    ".txt",
-    ".env",
-    ".yaml",
-    ".yml",
-    ".xml",
-)
+def _extract_strings(filepath, min_length=8):
+    """
+    Extract printable ASCII strings from a binary.
 
-
-def is_ignored_url(value):
-    value_lower = value.lower()
-
-    return any(
-        domain in value_lower
-        for domain in IGNORED_DOMAINS
-    )
-
-
-def scan_data(data, file_path):
-    findings = []
-
-    for rule_id, pattern in PATTERNS.items():
-
-        try:
-            matches = set(re.findall(pattern, data))
-        except re.error:
-            continue
-
-        for match in matches:
-
-            if rule_id == "flutter_http":
-                if is_ignored_url(match):
-                    continue
-
-            findings.append({
-                "rule_id": rule_id,
-                "file": file_path,
-                "match": match,
-            })
-
-    return findings
-
-
-def scan_binary(path):
+    This is much safer than decoding the entire .so file because
+    Flutter AOT binaries contain huge amounts of binary data mixed
+    with legitimate strings.
+    """
     try:
-        with open(path, "rb") as f:
-            data = f.read()
-
-        text = data.decode(
-            "latin1",
-            errors="ignore"
+        result = subprocess.run(
+            ["strings", "-n", str(min_length), filepath],
+            capture_output=True,
+            text=True,
+            errors="ignore",
+            timeout=30,
         )
 
-        return scan_data(text, path)
+        if result.returncode == 0:
+            return result.stdout.splitlines()
 
-    except (OSError, IOError):
-        return []
+    except (OSError, subprocess.TimeoutExpired):
+        pass
 
-
-def scan_text_file(path):
+    # Fallback if the `strings` command isn't available.
     try:
-        with open(
-            path,
-            "r",
-            encoding="utf-8",
-            errors="ignore",
-        ) as f:
-            data = f.read()
+        data = Path(filepath).read_bytes()
 
-        return scan_data(data, path)
+        matches = re.findall(
+            rb"[\x20-\x7e]{%d,}" % min_length,
+            data,
+        )
 
-    except (OSError, IOError):
+        return [
+            item.decode("ascii", errors="ignore")
+            for item in matches
+        ]
+
+    except Exception:
         return []
 
 
-def check_flutter(apktool_dir):
-    findings = []
-    flutter_found = False
+def _clean_url(url):
+    """
+    Remove characters that commonly get attached to URLs when
+    extracting strings from binaries.
+    """
+    url = url.strip()
 
-    if not apktool_dir:
+    # Common punctuation that isn't part of the URL.
+    url = url.rstrip(".,;:!?)]}\"'")
+
+    return url
+
+
+def _domain(url):
+    match = re.match(
+        r"https?://([^/:?#]+)",
+        url,
+        re.IGNORECASE,
+    )
+
+    if not match:
+        return ""
+
+    return match.group(1).lower()
+
+
+def _is_ignored_url(url):
+    domain = _domain(url)
+
+    if not domain:
+        return True
+
+    # Ignore known framework/documentation domains.
+    for ignored in IGNORED_DOMAINS:
+        if domain == ignored or domain.endswith("." + ignored):
+            return True
+
+    return False
+
+
+def scan_flutter(apktool_dir, output_directory=None):
+    """
+    Scan Flutter native libraries for useful network indicators.
+
+    Returns a list of findings compatible with triage.py.
+    """
+
+    findings = []
+
+    if not os.path.isdir(apktool_dir):
         return findings
 
-    lib_dir = os.path.join(
-        apktool_dir,
-        "lib"
-    )
+    lib_dir = os.path.join(apktool_dir, "lib")
 
-    assets_dir = os.path.join(
-        apktool_dir,
-        "assets",
-        "flutter_assets"
-    )
+    if not os.path.isdir(lib_dir):
+        return findings
 
-    # Detect Flutter native libraries.
-    if os.path.isdir(lib_dir):
+    # Flutter APKs normally contain libapp.so and libflutter.so.
+    flutter_files = []
 
-        for root, _, files in os.walk(lib_dir):
-
-            if "libflutter.so" in files:
-                flutter_found = True
-
-            if "libapp.so" in files:
-                flutter_found = True
-
-                path = os.path.join(
-                    root,
-                    "libapp.so"
+    for root, _, files in os.walk(lib_dir):
+        for filename in files:
+            if filename in ("libapp.so", "libflutter.so"):
+                flutter_files.append(
+                    os.path.join(root, filename)
                 )
 
-                findings.extend(
-                    scan_binary(path)
-                )
+    if not flutter_files:
+        return findings
 
-    # Scan Flutter assets.
-    if os.path.isdir(assets_dir):
+    # One framework detection finding.
+    findings.append({
+        "rule_id": "flutter_detected",
+        "file": "Flutter",
+        "match": "Flutter framework detected",
+    })
 
-        flutter_found = True
+    seen_urls = set()
 
-        for root, _, files in os.walk(assets_dir):
+    for filepath in flutter_files:
+        strings = _extract_strings(filepath)
 
-            for file in files:
+        for string in strings:
+            for match in re.findall(
+                RULES["flutter_http"],
+                string,
+                re.IGNORECASE,
+            ):
+                url = _clean_url(match)
 
-                if (
-                    file.endswith(ASSET_EXTENSIONS)
-                    or file in (
-                        "AssetManifest.json",
-                        "FontManifest.json",
-                        "NOTICES.Z",
-                    )
-                ):
-                    path = os.path.join(
-                        root,
-                        file
-                    )
+                if not url:
+                    continue
 
-                    findings.extend(
-                        scan_text_file(path)
-                    )
+                if _is_ignored_url(url):
+                    continue
 
-    # Add framework detection once.
-    if flutter_found:
+                # Avoid the same endpoint being reported hundreds
+                # of times across different architectures.
+                normalized = url.lower()
 
-        findings.insert(
-            0,
-            {
-                "rule_id": "flutter_detected",
-                "file": "Flutter",
-                "match": "Flutter framework detected",
-            },
-        )
+                if normalized in seen_urls:
+                    continue
+
+                seen_urls.add(normalized)
+
+                findings.append({
+                    "rule_id": "flutter_http",
+                    "file": filepath,
+                    "match": url,
+                })
 
     return findings
+
+
+# Compatibility aliases in case triage.py uses another function name.
+scan = scan_flutter
+check = scan_flutter
+check_flutter = scan_flutter

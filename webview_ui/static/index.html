@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RedflagAPK | Material 3 Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body class="m3-dark-theme">
+    <div class="m3-layout">
+        <!-- M3 Navigation Drawer / History -->
+        <aside class="m3-drawer">
+            <div class="m3-drawer-header">
+                <span class="m3-icon">🚩</span>
+                <h2>RedflagAPK</h2>
+            </div>
+            <div class="m3-drawer-title">Recent Scans</div>
+            <div id="historyList" class="m3-drawer-list"></div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="m3-main">
+            <!-- App Bar -->
+            <header class="m3-appbar">
+                <div>
+                    <h1 class="m3-headline-small">Mobile Malware Triage</h1>
+                    <p class="m3-body-medium">Material Triage Dashboard</p>
+                </div>
+                <div id="statusBadge" class="m3-chip m3-chip-ready">
+                    <span class="m3-chip-dot"></span>
+                    <span id="statusText">SYSTEM READY</span>
+                </div>
+            </header>
+
+            <!-- M3 Target Selection Surface -->
+            <section class="m3-card m3-card-elevated">
+                <div class="m3-card-title">Target Selection</div>
+                <div class="m3-input-row">
+                    <div class="m3-text-field">
+                        <label for="apkPath">APK File Path</label>
+                        <input type="text" id="apkPath" placeholder="e.g. /sdcard/MT2/apks/1xBet_1.0.apk" value="/sdcard/MT2/apks/1xBet_1.0.apk">
+                    </div>
+                    <div class="m3-text-field m3-field-small">
+                        <label for="threads">Threads</label>
+                        <input type="number" id="threads" value="4" min="1" max="16">
+                    </div>
+                    <button id="scanBtn" onclick="triggerScan()" class="m3-btn m3-btn-primary">
+                        <span>Run Triage</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Execution View -->
+            <section id="executionView" class="m3-card m3-card-outlined">
+                <div class="m3-execution-grid">
+                    <div class="m3-pipeline">
+                        <div class="m3-subtitle">Analysis Pipeline</div>
+                        <ul id="stageList" class="m3-stage-list">
+                            <li id="stage-prep" class="m3-stage">[ ] Preparing Target</li>
+                            <li id="stage-apktool" class="m3-stage">[ ] Unpacking (apktool)</li>
+                            <li id="stage-jadx" class="m3-stage">[ ] Decompiling (JADX)</li>
+                            <li id="stage-static" class="m3-stage">[ ] Static Analysis Engine</li>
+                            <li id="stage-report" class="m3-stage">[ ] Compiling Report</li>
+                        </ul>
+                    </div>
+                    <div class="m3-console">
+                        <div class="m3-console-header">live_execution.log</div>
+                        <pre id="terminalLogs" class="m3-console-body">Waiting for target...</pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Dashboard -->
+            <section id="resultsDashboard" class="m3-dashboard hidden">
+                <!-- Meta Info Card -->
+                <div class="m3-card m3-card-elevated">
+                    <div class="m3-card-title">Target Context</div>
+                    <div class="m3-grid-3">
+                        <div class="m3-meta-item"><span class="label">File</span><strong id="metaFile">-</strong></div>
+                        <div class="m3-meta-item"><span class="label">Package</span><strong id="metaPackage">-</strong></div>
+                        <div class="m3-meta-item"><span class="label">Version</span><strong id="metaVersion">-</strong></div>
+                        <div class="m3-meta-item"><span class="label">SHA-256</span><strong id="metaHash" class="mono">-</strong></div>
+                        <div class="m3-meta-item"><span class="label">Size</span><strong id="metaSize">-</strong></div>
+                        <div class="m3-meta-item"><span class="label">Execution Time</span><strong id="metaTime">-</strong></div>
+                    </div>
+                </div>
+
+                <!-- Severity Stats -->
+                <div class="m3-stats-row">
+                    <div class="m3-stat-card high"><span class="val" id="countHigh">0</span><span class="lbl">HIGH</span></div>
+                    <div class="m3-stat-card med"><span class="val" id="countMedium">0</span><span class="lbl">MEDIUM</span></div>
+                    <div class="m3-stat-card low"><span class="val" id="countLow">0</span><span class="lbl">LOW</span></div>
+                    <div class="m3-stat-card info"><span class="val" id="countInfo">0</span><span class="lbl">INFO</span></div>
+                </div>
+
+                <!-- Findings Accordion -->
+                <div class="m3-card m3-card-elevated">
+                    <div class="m3-card-title">Detected Indicators</div>
+                    <div id="findingsContainer" class="m3-findings-list"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
