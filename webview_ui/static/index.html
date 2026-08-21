@@ -45,10 +45,24 @@
                         <label for="threads">Threads</label>
                         <input type="number" id="threads" value="4" min="1" max="16">
                     </div>
+                    <button onclick="openBrowser()" class="m3-btn m3-btn-secondary">Browse…</button>
                     <button id="scanBtn" onclick="triggerScan()" class="m3-btn m3-btn-primary">
                         <span>Run Triage</span>
                     </button>
                 </div>
+            </section>
+
+            <!-- File Browser Panel -->
+            <section id="browserPanel" class="m3-card m3-card-outlined hidden">
+                <div class="m3-card-title">Browse for APK</div>
+                <div class="m3-browser-toolbar">
+                    <div id="browserPath" class="m3-browser-path mono">/sdcard</div>
+                    <div class="m3-browser-roots">
+                        <button class="m3-chip-btn" onclick="browseTo('/sdcard')">sdcard</button>
+                        <button class="m3-chip-btn" onclick="browseTo('/sdcard/Download')">Downloads</button>
+                    </div>
+                </div>
+                <div id="browserList" class="m3-browser-list"></div>
             </section>
 
             <!-- Execution View -->
@@ -57,11 +71,11 @@
                     <div class="m3-pipeline">
                         <div class="m3-subtitle">Analysis Pipeline</div>
                         <ul id="stageList" class="m3-stage-list">
-                            <li id="stage-prep" class="m3-stage">[ ] Preparing Target</li>
-                            <li id="stage-apktool" class="m3-stage">[ ] Unpacking (apktool)</li>
-                            <li id="stage-jadx" class="m3-stage">[ ] Decompiling (JADX)</li>
-                            <li id="stage-static" class="m3-stage">[ ] Static Analysis Engine</li>
-                            <li id="stage-report" class="m3-stage">[ ] Compiling Report</li>
+                            <li id="stage-prep" class="m3-stage" data-label="Preparing Target">[ ] Preparing Target</li>
+                            <li id="stage-apktool" class="m3-stage" data-label="Unpacking (apktool)">[ ] Unpacking (apktool)</li>
+                            <li id="stage-jadx" class="m3-stage" data-label="Decompiling (JADX)">[ ] Decompiling (JADX)</li>
+                            <li id="stage-static" class="m3-stage" data-label="Static Analysis Engine">[ ] Static Analysis Engine</li>
+                            <li id="stage-report" class="m3-stage" data-label="Compiling Report">[ ] Compiling Report</li>
                         </ul>
                     </div>
                     <div class="m3-console">
@@ -87,7 +101,7 @@
                 </div>
 
                 <!-- Severity Stats -->
-                <div class="m3-stats-row">
+                <div class="m3-stats-row" id="statsRow">
                     <div class="m3-stat-card high"><span class="val" id="countHigh">0</span><span class="lbl">HIGH</span></div>
                     <div class="m3-stat-card med"><span class="val" id="countMedium">0</span><span class="lbl">MEDIUM</span></div>
                     <div class="m3-stat-card low"><span class="val" id="countLow">0</span><span class="lbl">LOW</span></div>

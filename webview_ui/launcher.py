@@ -1,5 +1,8 @@
+# launcher.py
 import sys
-import base64
+import time
+import threading
+import urllib.request
 
 try:
     import termuxgui as tg
@@ -7,29 +10,34 @@ except ImportError:
     print("[!] Run: pip install termuxgui")
     sys.exit(1)
 
-HTML_PAYLOAD = """<!DOCTYPE html>
-<html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { background: #121212; color: #e0e0e0; font-family: sans-serif; padding: 20px; }
-        .card { background: #1e1e1e; border: 1px solid #333; border-radius: 12px; padding: 20px; }
-        .badge { background: #00e676; color: #000; font-weight: bold; padding: 4px 10px; border-radius: 4px; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h2>🚩 RedflagAPK Engine</h2>
-        <p>Termux:GUI WebView Engine Online!</p>
-        <p>Status: <span class="badge">READY</span></p>
-    </div>
-</body>
-</html>"""
+from app import app  # your Flask app object from app.py
+
+SERVER_URL = "http://127.0.0.1:5000/"
+
+
+def start_flask():
+    app.run(host="127.0.0.1", port=5000, debug=False, use_reloader=False)
+
+
+def wait_for_server(url, timeout=15):
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            urllib.request.urlopen(url, timeout=1)
+            return True
+        except Exception:
+            time.sleep(0.3)
+    return False
+
 
 def main():
-    # Encode HTML string to Base64 Data URI to prevent white-screen parsing bugs
-    b64_data = base64.b64encode(HTML_PAYLOAD.encode("utf-8")).decode("utf-8")
-    data_uri = f"data:text/html;charset=utf-8;base64,{b64_data}"
+    # Start Flask in the background so the WebView has something to load
+    flask_thread = threading.Thread(target=start_flask, daemon=True)
+    flask_thread.start()
+
+    if not wait_for_server(SERVER_URL):
+        print("[!] Flask server never came up, aborting.")
+        sys.exit(1)
 
     try:
         with tg.Connection() as conn:
@@ -37,17 +45,18 @@ def main():
             webview = tg.WebView(activity)
 
             if hasattr(webview, "loadurl"):
-                webview.loadurl(data_uri)
+                webview.loadurl(SERVER_URL)
             elif hasattr(webview, "setdata"):
-                webview.setdata(data_uri)
+                webview.setdata(SERVER_URL)
 
-            print("[+] WebView rendered via Base64 Data-URI!")
+            print(f"[+] WebView loaded {SERVER_URL}")
 
             for event in conn.events():
                 if (getattr(event, "type", None) or str(event)) == "destroy":
                     break
     except Exception as e:
         print(f"[!] Error: {e}")
+
 
 if __name__ == "__main__":
     main()

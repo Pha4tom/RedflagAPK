@@ -2,8 +2,10 @@ import os
 import sys
 import json
 import time
+import hashlib
 import argparse
 import concurrent.futures
+import xml.etree.ElementTree as ET
 
 from runners.apktool import run_apktool
 from runners.jadx import run_jadx
@@ -130,6 +132,49 @@ def compute_severity(findings: list) -> str:
 
 
 # ============================================================
+# METADATA
+# ============================================================
+
+def extract_apk_metadata(apk_path, apktool_dir):
+    """Pull package name, version, sha256, and file size for the dashboard."""
+
+    metadata = {
+        "package": None,
+        "version": None,
+        "sha256": None,
+        "size": None,
+    }
+
+    try:
+        metadata["size"] = os.path.getsize(apk_path)
+    except OSError:
+        pass
+
+    try:
+        h = hashlib.sha256()
+        with open(apk_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                h.update(chunk)
+        metadata["sha256"] = h.hexdigest()
+    except OSError:
+        pass
+
+    if apktool_dir:
+        manifest_path = os.path.join(apktool_dir, "AndroidManifest.xml")
+        if os.path.exists(manifest_path):
+            try:
+                tree = ET.parse(manifest_path)
+                root = tree.getroot()
+                metadata["package"] = root.attrib.get("package")
+                ns = "{http://schemas.android.com/apk/res/android}"
+                metadata["version"] = root.attrib.get(f"{ns}versionName")
+            except Exception:
+                pass
+
+    return metadata
+
+
+# ============================================================
 # PROGRESS BAR
 # ============================================================
 
@@ -228,6 +273,11 @@ def main():
 
     args = parser.parse_args()
 
+    # Validate CLI inputs early so malformed requests fail cleanly instead of
+    # starting expensive JADX/Apktool work with unusable arguments.
+    if not 1 <= args.threads <= 16:
+        parser.error("--threads must be between 1 and 16")
+
     # --------------------------------------------------------
     # Paths
     # --------------------------------------------------------
@@ -237,6 +287,12 @@ def main():
     apk_path = os.path.abspath(
         os.path.expanduser(args.apk)
     )
+
+    if not os.path.isfile(apk_path):
+        parser.error(f"APK does not exist or is not a file: {apk_path}")
+
+    if not apk_path.lower().endswith(".apk"):
+        parser.error("Target must be an .apk file")
 
     output_dir = os.path.abspath(
         os.path.expanduser(args.output)
@@ -389,13 +445,10 @@ def main():
             max_workers=args.threads
         ) as executor:
 
-            futures = [
-                executor.submit(
-                    worker_task,
-                    file_path,
-                )
+            futures = {
+                executor.submit(worker_task, file_path): file_path
                 for file_path in files_to_scan
-            ]
+            }
 
             for future in concurrent.futures.as_completed(
                 futures
@@ -412,7 +465,7 @@ def main():
                 except Exception as error:
 
                     print(
-                        f"\n[!] Worker error: "
+                        f"\n[!] Worker error for {futures[future]}: "
                         f"{error}"
                     )
 
@@ -539,6 +592,14 @@ def main():
         findings
     )
 
+    # Stamp per-flag severity so the dashboard can color/sort
+    # individual findings, not just show one overall rating.
+    for finding in findings:
+        rule_id = finding.get("rule_id") or finding.get("type")
+        finding["severity"] = SEVERITY_MAP.get(rule_id, "low")
+
+    metadata = extract_apk_metadata(apk_path, apktool_dir)
+
     # ========================================================
     # REPORT
     # ========================================================
@@ -548,6 +609,8 @@ def main():
         "target": os.path.basename(
             apk_path
         ),
+
+        "metadata": metadata,
 
         "execution_time_seconds": round(
             total_time,
