@@ -1,0 +1,183 @@
+package kotlinx.coroutines;
+
+import androidx.constraintlayout.widget.ConstraintLayout;
+import kotlin.Metadata;
+import kotlin.coroutines.Continuation;
+import kotlin.coroutines.ContinuationInterceptor;
+import kotlin.coroutines.CoroutineContext;
+import kotlin.coroutines.EmptyCoroutineContext;
+import kotlin.coroutines.jvm.internal.CoroutineStackFrame;
+import kotlin.jvm.functions.Function0;
+import kotlin.jvm.functions.Function2;
+import kotlin.jvm.internal.Ref;
+import kotlinx.coroutines.internal.ThreadContextKt;
+
+/* JADX INFO: compiled from: CoroutineContext.kt */
+/* JADX INFO: loaded from: classes.dex */
+@Metadata(d1 = {"\u0000B\n\u0000\n\u0002\u0018\u0002\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0010\u000b\n\u0002\b\u0007\n\u0002\u0010\u0000\n\u0000\n\u0002\u0018\u0002\n\u0002\b\u0003\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0002\b\u0002\n\u0002\u0018\u0002\n\u0000\n\u0002\u0010\u000e\n\u0002\b\u0004\u001a\u0014\u0010\u0000\u001a\u00020\u0001*\u00020\u00022\u0006\u0010\u0003\u001a\u00020\u0001H\u0007\u001a\u0014\u0010\u0000\u001a\u00020\u0001*\u00020\u00012\u0006\u0010\u0004\u001a\u00020\u0001H\u0007\u001a\f\u0010\u0005\u001a\u00020\u0006*\u00020\u0001H\u0002\u001a \u0010\u0007\u001a\u00020\u00012\u0006\u0010\b\u001a\u00020\u00012\u0006\u0010\t\u001a\u00020\u00012\u0006\u0010\n\u001a\u00020\u0006H\u0002\u001a4\u0010\u000b\u001a\u0002H\f\"\u0004\b\u0000\u0010\f2\u0006\u0010\u0003\u001a\u00020\u00012\b\u0010\r\u001a\u0004\u0018\u00010\u000e2\f\u0010\u000f\u001a\b\u0012\u0004\u0012\u0002H\f0\u0010H\u0080\b¢\u0006\u0002\u0010\u0011\u001a8\u0010\u0012\u001a\u0002H\f\"\u0004\b\u0000\u0010\f2\n\u0010\u0013\u001a\u0006\u0012\u0002\b\u00030\u00142\b\u0010\r\u001a\u0004\u0018\u00010\u000e2\f\u0010\u000f\u001a\b\u0012\u0004\u0012\u0002H\f0\u0010H\u0080\b¢\u0006\u0002\u0010\u0015\u001a(\u0010\u0016\u001a\b\u0012\u0002\b\u0003\u0018\u00010\u0017*\u0006\u0012\u0002\b\u00030\u00142\u0006\u0010\u0003\u001a\u00020\u00012\b\u0010\u0018\u001a\u0004\u0018\u00010\u000eH\u0000\u001a\u0013\u0010\u0019\u001a\b\u0012\u0002\b\u0003\u0018\u00010\u0017*\u00020\u001aH\u0080\u0010\"\u001a\u0010\u001b\u001a\u0004\u0018\u00010\u001c*\u00020\u00018@X\u0080\u0004¢\u0006\u0006\u001a\u0004\b\u001d\u0010\u001e\"\u000e\u0010\u001f\u001a\u00020\u001cX\u0082T¢\u0006\u0002\n\u0000¨\u0006 "}, d2 = {"newCoroutineContext", "Lkotlin/coroutines/CoroutineContext;", "Lkotlinx/coroutines/CoroutineScope;", "context", "addedContext", "hasCopyableElements", "", "foldCopies", "originalContext", "appendContext", "isNewCoroutine", "withCoroutineContext", "T", "countOrElement", "", "block", "Lkotlin/Function0;", "(Lkotlin/coroutines/CoroutineContext;Ljava/lang/Object;Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;", "withContinuationContext", "continuation", "Lkotlin/coroutines/Continuation;", "(Lkotlin/coroutines/Continuation;Ljava/lang/Object;Lkotlin/jvm/functions/Function0;)Ljava/lang/Object;", "updateUndispatchedCompletion", "Lkotlinx/coroutines/UndispatchedCoroutine;", "oldValue", "undispatchedCompletion", "Lkotlin/coroutines/jvm/internal/CoroutineStackFrame;", "coroutineName", "", "getCoroutineName", "(Lkotlin/coroutines/CoroutineContext;)Ljava/lang/String;", "DEBUG_THREAD_NAME_SEPARATOR", "kotlinx-coroutines-core"}, k = 2, mv = {2, 0, 0}, xi = ConstraintLayout.LayoutParams.Table.LAYOUT_CONSTRAINT_VERTICAL_CHAINSTYLE)
+public final class CoroutineContextKt {
+    private static final String DEBUG_THREAD_NAME_SEPARATOR = " @";
+
+    public static final CoroutineContext newCoroutineContext(CoroutineScope $this$newCoroutineContext, CoroutineContext context) {
+        CoroutineContext combined = foldCopies($this$newCoroutineContext.getCoroutineContext(), context, true);
+        CoroutineContext debug = DebugKt.getDEBUG() ? combined.plus(new CoroutineId(DebugKt.getCOROUTINE_ID().incrementAndGet())) : combined;
+        return (combined == Dispatchers.getDefault() || combined.get(ContinuationInterceptor.INSTANCE) != null) ? debug : debug.plus(Dispatchers.getDefault());
+    }
+
+    public static final CoroutineContext newCoroutineContext(CoroutineContext $this$newCoroutineContext, CoroutineContext addedContext) {
+        return !hasCopyableElements(addedContext) ? $this$newCoroutineContext.plus(addedContext) : foldCopies($this$newCoroutineContext, addedContext, false);
+    }
+
+    private static final boolean hasCopyableElements(CoroutineContext $this$hasCopyableElements) {
+        return ((Boolean) $this$hasCopyableElements.fold(false, new Function2() { // from class: kotlinx.coroutines.CoroutineContextKt$$ExternalSyntheticLambda0
+            @Override // kotlin.jvm.functions.Function2
+            public final Object invoke(Object obj, Object obj2) {
+                return Boolean.valueOf(CoroutineContextKt.hasCopyableElements$lambda$0(((Boolean) obj).booleanValue(), (CoroutineContext.Element) obj2));
+            }
+        })).booleanValue();
+    }
+
+    /* JADX INFO: Access modifiers changed from: private */
+    public static final boolean hasCopyableElements$lambda$0(boolean result, CoroutineContext.Element it) {
+        return result || (it instanceof CopyableThreadContextElement);
+    }
+
+    /* JADX WARN: Multi-variable type inference failed */
+    /* JADX WARN: Type inference failed for: r4v6, types: [T, java.lang.Object] */
+    private static final CoroutineContext foldCopies(CoroutineContext originalContext, CoroutineContext coroutineContext, final boolean isNewCoroutine) {
+        boolean hasElementsLeft = hasCopyableElements(originalContext);
+        boolean hasElementsRight = hasCopyableElements(coroutineContext);
+        if (!hasElementsLeft && !hasElementsRight) {
+            return originalContext.plus(coroutineContext);
+        }
+        final Ref.ObjectRef leftoverContext = new Ref.ObjectRef();
+        leftoverContext.element = coroutineContext;
+        CoroutineContext folded = (CoroutineContext) originalContext.fold(EmptyCoroutineContext.INSTANCE, new Function2() { // from class: kotlinx.coroutines.CoroutineContextKt$$ExternalSyntheticLambda1
+            @Override // kotlin.jvm.functions.Function2
+            public final Object invoke(Object obj, Object obj2) {
+                return CoroutineContextKt.foldCopies$lambda$1(leftoverContext, isNewCoroutine, (CoroutineContext) obj, (CoroutineContext.Element) obj2);
+            }
+        });
+        if (hasElementsRight) {
+            leftoverContext.element = ((CoroutineContext) leftoverContext.element).fold(EmptyCoroutineContext.INSTANCE, new Function2() { // from class: kotlinx.coroutines.CoroutineContextKt$$ExternalSyntheticLambda2
+                @Override // kotlin.jvm.functions.Function2
+                public final Object invoke(Object obj, Object obj2) {
+                    return CoroutineContextKt.foldCopies$lambda$2((CoroutineContext) obj, (CoroutineContext.Element) obj2);
+                }
+            });
+        }
+        return folded.plus((CoroutineContext) leftoverContext.element);
+    }
+
+    /* JADX INFO: Access modifiers changed from: private */
+    /* JADX WARN: Type inference failed for: r1v3, types: [T, kotlin.coroutines.CoroutineContext] */
+    public static final CoroutineContext foldCopies$lambda$1(Ref.ObjectRef $leftoverContext, boolean $isNewCoroutine, CoroutineContext result, CoroutineContext.Element element) {
+        if (!(element instanceof CopyableThreadContextElement)) {
+            return result.plus(element);
+        }
+        CoroutineContext.Element newElement = ((CoroutineContext) $leftoverContext.element).get(element.getKey());
+        if (newElement == null) {
+            CopyableThreadContextElement copyableThreadContextElementCopyForChild = (CopyableThreadContextElement) element;
+            if ($isNewCoroutine) {
+                copyableThreadContextElementCopyForChild = copyableThreadContextElementCopyForChild.copyForChild();
+            }
+            return result.plus(copyableThreadContextElementCopyForChild);
+        }
+        $leftoverContext.element = ((CoroutineContext) $leftoverContext.element).minusKey(element.getKey());
+        return result.plus(((CopyableThreadContextElement) element).mergeForChild(newElement));
+    }
+
+    /* JADX INFO: Access modifiers changed from: private */
+    public static final CoroutineContext foldCopies$lambda$2(CoroutineContext result, CoroutineContext.Element element) {
+        if (element instanceof CopyableThreadContextElement) {
+            return result.plus(((CopyableThreadContextElement) element).copyForChild());
+        }
+        return result.plus(element);
+    }
+
+    public static final <T> T withCoroutineContext(CoroutineContext context, Object countOrElement, Function0<? extends T> function0) {
+        Object oldValue = ThreadContextKt.updateThreadContext(context, countOrElement);
+        try {
+            return function0.invoke();
+        } finally {
+            ThreadContextKt.restoreThreadContext(context, oldValue);
+        }
+    }
+
+    /* JADX WARN: Removed duplicated region for block: B:11:0x0021 A[DONT_GENERATE] */
+    /*
+        Code decompiled incorrectly, please refer to instructions dump.
+        To view partially-correct add '--show-bad-code' argument
+    */
+    public static final <T> T withContinuationContext(kotlin.coroutines.Continuation<?> r6, java.lang.Object r7, kotlin.jvm.functions.Function0<? extends T> r8) {
+        /*
+            r0 = 0
+            kotlin.coroutines.CoroutineContext r1 = r6.getContext()
+            java.lang.Object r2 = kotlinx.coroutines.internal.ThreadContextKt.updateThreadContext(r1, r7)
+            kotlinx.coroutines.internal.Symbol r3 = kotlinx.coroutines.internal.ThreadContextKt.NO_THREAD_ELEMENTS
+            if (r2 == r3) goto L12
+            kotlinx.coroutines.UndispatchedCoroutine r3 = updateUndispatchedCompletion(r6, r1, r2)
+            goto L13
+        L12:
+            r3 = 0
+        L13:
+            java.lang.Object r4 = r8.invoke()     // Catch: java.lang.Throwable -> L26
+            if (r3 == 0) goto L21
+            boolean r5 = r3.clearThreadContext()
+            if (r5 == 0) goto L24
+        L21:
+            kotlinx.coroutines.internal.ThreadContextKt.restoreThreadContext(r1, r2)
+        L24:
+            return r4
+        L26:
+            r4 = move-exception
+            if (r3 == 0) goto L2f
+            boolean r5 = r3.clearThreadContext()
+            if (r5 == 0) goto L32
+        L2f:
+            kotlinx.coroutines.internal.ThreadContextKt.restoreThreadContext(r1, r2)
+        L32:
+            throw r4
+        */
+        throw new UnsupportedOperationException("Method not decompiled: kotlinx.coroutines.CoroutineContextKt.withContinuationContext(kotlin.coroutines.Continuation, java.lang.Object, kotlin.jvm.functions.Function0):java.lang.Object");
+    }
+
+    public static final UndispatchedCoroutine<?> updateUndispatchedCompletion(Continuation<?> continuation, CoroutineContext context, Object oldValue) {
+        if (!(continuation instanceof CoroutineStackFrame)) {
+            return null;
+        }
+        boolean potentiallyHasUndispatchedCoroutine = context.get(UndispatchedMarker.INSTANCE) != null;
+        if (!potentiallyHasUndispatchedCoroutine) {
+            return null;
+        }
+        UndispatchedCoroutine<?> undispatchedCoroutineUndispatchedCompletion = undispatchedCompletion((CoroutineStackFrame) continuation);
+        if (undispatchedCoroutineUndispatchedCompletion != null) {
+            undispatchedCoroutineUndispatchedCompletion.saveThreadContext(context, oldValue);
+        }
+        return undispatchedCoroutineUndispatchedCompletion;
+    }
+
+    public static final UndispatchedCoroutine<?> undispatchedCompletion(CoroutineStackFrame $this$undispatchedCompletion) {
+        CoroutineStackFrame completion;
+        while (!($this$undispatchedCompletion instanceof DispatchedCoroutine) && (completion = $this$undispatchedCompletion.getCallerFrame()) != null) {
+            if (completion instanceof UndispatchedCoroutine) {
+                return (UndispatchedCoroutine) completion;
+            }
+            $this$undispatchedCompletion = completion;
+        }
+        return null;
+    }
+
+    public static final String getCoroutineName(CoroutineContext $this$coroutineName) {
+        CoroutineId coroutineId;
+        String coroutineName;
+        if (!DebugKt.getDEBUG() || (coroutineId = (CoroutineId) $this$coroutineName.get(CoroutineId.INSTANCE)) == null) {
+            return null;
+        }
+        CoroutineName coroutineName2 = (CoroutineName) $this$coroutineName.get(CoroutineName.INSTANCE);
+        if (coroutineName2 == null || (coroutineName = coroutineName2.getName()) == null) {
+            coroutineName = "coroutine";
+        }
+        return coroutineName + '#' + coroutineId.getId();
+    }
+}
